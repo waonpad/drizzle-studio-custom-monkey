@@ -1,0 +1,31 @@
+{
+  "name": "drizzle-studio-custom-monkey",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "prepare": "lefthook install",
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "release": "bumpp-version",
+    "format": "biome format --write .",
+    "lint": "biome lint --write . && bun run lint:eslint",
+    "lint:eslint": "eslint --fix",
+    "lint:circular-deps": "madge --circular src/",
+    "check": "biome check --write . && bun run lint:eslint"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@stylistic/eslint-plugin": "^4.4.0",
+    "bumpp-version": "^1.0.2",
+    "eslint": "^9.27.0",
+    "eslint-plugin-sonarjs": "^3.0.2",
+    "jiti": "^2.4.2",
+    "lefthook": "^1.11.13",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.32.1",
+    "vite": "^6.3.5",
+    "vite-plugin-monkey": "^5.0.8"
+  }
+}

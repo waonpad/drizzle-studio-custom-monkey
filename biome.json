@@ -1,0 +1,45 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "organizeImports": {
+    "enabled": true
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "lineWidth": 120
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "all": true,
+      "correctness": {
+        "noNodejsModules": "off",
+        "useImportExtensions": "off",
+        "noUndeclaredDependencies": "off"
+      },
+      "security": {
+        "noDangerouslySetInnerHtml": "off"
+      },
+      "style": {
+        "noDefaultExport": "off",
+        "useNamingConvention": "off",
+        "noNamespaceImport": "off"
+      },
+      "suspicious": {
+        "noConsole": "off",
+        "noConsoleLog": "off",
+        "noReactSpecificProps": "off"
+      },
+      "nursery": {
+        "useSortedClasses": {
+          "fix": "safe",
+          "level": "error",
+          "options": {}
+        }
+      }
+    }
+  },
+  "files": {
+    "ignore": ["**/node_modules/**", "**/*.json", "dist/**"]
+  }
+}
