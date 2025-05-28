@@ -275,9 +275,7 @@ const fillRowCells = async (row: HTMLDivElement, values: string[]): Promise<void
 
     document.execCommand("delete");
 
-    // クリップボードAPIで値をペースト（Clipboard APIが使えない場合はexecCommandで代用）
-    // ここではexecCommand('insertText')を使う
-    // TODO: AIがexecCommandを出してきたが、後でClipboard APIに置き換える
+    // 代替手段が無いっぽいので非推奨だがexecCommandを使う
     document.execCommand("insertText", false, values[i]);
 
     // 入力確定（Enterキーイベントを送る）
