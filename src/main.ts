@@ -270,11 +270,6 @@ const fillRowCells = async (row: HTMLDivElement, values: string[]): Promise<void
     // inputにフォーカス
     input.focus();
 
-    // 既存の値を全選択して消す（必要なら）
-    input.select();
-
-    document.execCommand("delete");
-
     // 代替手段が無いっぽいので非推奨だがexecCommandを使う
     document.execCommand("insertText", false, values[i]);
 
