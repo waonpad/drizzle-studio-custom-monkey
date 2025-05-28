@@ -267,9 +267,6 @@ const fillRowCells = async (row: HTMLDivElement, values: string[]): Promise<void
       continue;
     }
 
-    // inputにフォーカス
-    input.focus();
-
     // 代替手段が無いっぽいので非推奨だがexecCommandを使う
     document.execCommand("insertText", false, values[i]);
 
