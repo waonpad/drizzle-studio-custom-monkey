@@ -258,7 +258,7 @@ const fillRowCells = async (row: HTMLDivElement, values: string[]): Promise<void
         break;
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 1));
     }
 
     if (!input) {
