@@ -282,9 +282,6 @@ const fillRowCells = async (row: HTMLDivElement, values: string[]): Promise<void
     input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
 
     input.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", bubbles: true }));
-
-    // 入力後、少し待つ
-    await new Promise((resolve) => setTimeout(resolve, 100));
   }
 };
 
