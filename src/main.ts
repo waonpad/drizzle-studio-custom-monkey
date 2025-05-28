@@ -1,64 +1,86 @@
 import hotkeys from "hotkeys-js";
 
 /**
+ * セレクタ定数
+ */
+const HEADER_ROW_SELECTOR = "div[role='row'][aria-rowindex='1']";
+const RECORD_ROW_SELECTOR =
+  "div[role='row']:not([aria-rowindex='1']):has(> div:first-child > button[aria-checked='true'])";
+
+/**
+ * 汎用ユーティリティ
+ */
+const queryAll = <T extends Element>(root: ParentNode, selector: string): T[] =>
+  Array.from(root.querySelectorAll<T>(selector));
+
+/**
  * ヘッダー行を取得
  */
-function getHeaderRow(documentClone: Document): HTMLDivElement | null {
-  return documentClone.querySelector<HTMLDivElement>("div[role='row'][aria-rowindex='1']");
-}
+const getHeaderRow = (documentRoot: Document): HTMLDivElement | null =>
+  documentRoot.querySelector<HTMLDivElement>(HEADER_ROW_SELECTOR);
 
 /**
- * ヘッダーセルのうち、子要素が1つしかないものの要素とindexを取得
+ * 子要素が1つしかないセルのindexを取得
  */
-function getHeaderCellsToRemove(headerRow: HTMLDivElement): { item: Element; index: number }[] {
-  return Array.from(headerRow.children)
-    .map((cell, index) => (cell.children.length === 1 ? { item: cell, index } : null))
-    .filter((item): item is { item: Element; index: number } => item !== null);
-}
+const getSingleChildCellIndexes = (headerRow: HTMLDivElement): number[] =>
+  Array.from(headerRow.children)
+    .map((cell, idx) => (cell.children.length === 1 ? idx : -1))
+    .filter((idx) => idx !== -1);
 
 /**
- * セル内のspanで2つ目以降を削除
+ * セル内のspanで2つ目以降を返す（副作用なし）
  */
-function removeExtraSpans(cells: Element[]): void {
+const getExtraSpans = (cells: Element[]): Element[] => {
+  const extraSpans: Element[] = [];
+
   for (const cell of cells) {
-    const spansToRemove = Array.from(cell.querySelectorAll("span")).slice(1);
+    const spans = queryAll<Element>(cell, "span").slice(1);
 
-    for (const span of spansToRemove) {
-      span.remove();
-    }
+    extraSpans.push(...spans);
   }
-}
+
+  return extraSpans;
+};
 
 /**
- * 指定indexのセルを削除
+ * 指定indexのセルを返す（副作用なし）
  */
-function removeCellsByIndex(cells: Element[], indexesToRemove: number[]): void {
-  for (let i = cells.length - 1; i >= 0; i--) {
-    if (indexesToRemove.includes(i)) {
-      cells[i].remove();
-    }
-  }
-}
+const getCellsByIndexes = (cells: Element[], indexesToGet: number[]): Element[] => {
+  return indexesToGet.filter((idx) => cells[idx]).map((idx) => cells[idx]);
+};
 
 /**
- * レコード行から不要なセルを削除
+ * レコード行から不要なセルをまとめて返す（副作用なし）
  */
-function cleanRecordRows(rows: HTMLDivElement[], indexesToRemove: number[]): void {
+const getCellsToRemoveFromRows = (rows: HTMLDivElement[], indexesToRemove: number[]): Element[] => {
+  const cellsToRemove: Element[] = [];
+
   for (const row of rows) {
     const recordCells = Array.from(row.children);
 
-    removeCellsByIndex(recordCells, indexesToRemove);
+    cellsToRemove.push(...getCellsByIndexes(recordCells, indexesToRemove));
   }
-}
+
+  return cellsToRemove;
+};
+
+/**
+ * セルをまとめてremoveする（副作用あり）
+ */
+const removeElements = (elements: Element[]): void => {
+  for (const el of elements) {
+    el.remove();
+  }
+};
 
 /**
  * table要素を生成
  */
-function buildTable(
+const buildTable = (
   headerRow: HTMLDivElement | null,
   recordRows: HTMLDivElement[],
   withHeader: boolean,
-): HTMLTableElement {
+): HTMLTableElement => {
   const table = document.createElement("table");
 
   if (withHeader && headerRow) {
@@ -90,60 +112,50 @@ function buildTable(
   }
 
   return table;
-}
+};
 
 /**
  * table要素からTSV文字列を生成
  */
-function tableToTSV(table: HTMLTableElement): string {
-  const rows = Array.from(table.rows);
-
-  return rows
+const tableToTSV = (table: HTMLTableElement): string =>
+  Array.from(table.rows)
     .map((row) =>
       Array.from(row.cells)
-        .map((cell) => {
-          // タブや改行をエスケープ
-          // Excelでセル内改行したい場合は cell.innerText.replace(/\r?\n/g, "\n")
-          return cell.innerText.replace(/\r?\n/g, " ").replace(/\t/g, " ");
-        })
+        .map((cell) => cell.innerText.replace(/\r?\n/g, " ").replace(/\t/g, " "))
         .join("\t"),
     )
     .join("\n");
-}
 
 /**
  * クリップボードへコピー（text/html と text/plain 両対応）
  */
-function copyTableToClipboard(table: HTMLTableElement): void {
+const copyTableToClipboard = async (table: HTMLTableElement): Promise<void> => {
   const html = table.outerHTML;
   const tsv = tableToTSV(table);
 
-  const data = new ClipboardItem({
-    "text/html": new Blob([html], { type: "text/html" }),
-    "text/plain": new Blob([tsv], { type: "text/plain" }),
-  });
+  try {
+    const data = new ClipboardItem({
+      "text/html": new Blob([html], { type: "text/html" }),
+      "text/plain": new Blob([tsv], { type: "text/plain" }),
+    });
 
-  navigator.clipboard.write([data]).then(
-    () => {
-      console.log("Copied to clipboard successfully.");
-    },
-    (error) => {
-      console.error("Failed to copy to clipboard:", error);
-    },
-  );
-}
+    await navigator.clipboard.write([data]);
+
+    // UI通知も可能だが、ここではconsoleのみ
+    console.log("Copied to clipboard successfully.");
+  } catch (error) {
+    // 失敗時はUI通知も検討可
+    console.error("Failed to copy to clipboard:", error);
+  }
+};
 
 /**
- * メイン処理
+ * メイン処理: 選択行をテーブルとしてクリップボードにコピー
+ * @param withHeader ヘッダー行を含めるか
  */
-function copyRow(withHeader = true): void {
+const copySelectedRows = (withHeader = true): void => {
   const documentClone = document.cloneNode(true) as Document;
-
-  const selectedRecords = Array.from(
-    documentClone.querySelectorAll<HTMLDivElement>(
-      "div[role='row']:not([aria-rowindex='1']):has(> div:first-child > button[aria-checked='true'])",
-    ),
-  );
+  const selectedRecords = queryAll<HTMLDivElement>(documentClone, RECORD_ROW_SELECTOR);
 
   if (selectedRecords.length === 0) {
     console.error("No rows selected.");
@@ -157,50 +169,52 @@ function copyRow(withHeader = true): void {
   if (headerRow) {
     const headerCells = Array.from(headerRow.children);
 
-    removeExtraSpans(headerCells);
+    // spanの2つ目以降をまとめてremove
+    const extraSpans = getExtraSpans(headerCells);
 
-    const headerCellsToRemove = getHeaderCellsToRemove(headerRow);
+    removeElements(extraSpans);
 
-    indexesToRemove = headerCellsToRemove.map((item) => item.index);
+    indexesToRemove = getSingleChildCellIndexes(headerRow);
 
-    removeCellsByIndex(headerCells, indexesToRemove);
+    const headerCellsToRemove = getCellsByIndexes(headerCells, indexesToRemove);
+
+    removeElements(headerCellsToRemove);
   }
 
-  cleanRecordRows(selectedRecords, indexesToRemove);
+  // レコード行の不要セルもまとめてremove
+  const recordCellsToRemove = getCellsToRemoveFromRows(selectedRecords, indexesToRemove);
+
+  removeElements(recordCellsToRemove);
 
   const table = buildTable(withHeader ? headerRow : null, selectedRecords, withHeader);
 
   copyTableToClipboard(table);
-}
+};
 
 /**
  * ホットキー登録
  */
-function bindCopyRow(): void {
+const bindCopyShortcuts = (): void => {
   hotkeys("command+x", (event) => {
-    if (event.repeat) {
-      return;
+    if (!event.repeat) {
+      copySelectedRows(true); // ヘッダーあり
     }
-
-    copyRow(true); // ヘッダーあり
   });
 
   hotkeys("command+z", (event) => {
-    if (event.repeat) {
-      return;
+    if (!event.repeat) {
+      copySelectedRows(false); // ヘッダーなし
     }
-
-    copyRow(false); // ヘッダーなし
   });
-}
+};
 
-function init(): void {
+const init = (): void => {
   console.log("Initializing application...");
 
-  bindCopyRow();
+  bindCopyShortcuts();
 
   console.log("Application initialized successfully.");
-}
+};
 
 init();
 
