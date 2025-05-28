@@ -191,6 +191,141 @@ const copySelectedRows = (withHeader = true): void => {
   copyTableToClipboard(table);
 };
 
+// 正規表現リテラルはトップレベルで定義
+const NEWLINE_REGEX = /\r?\n/;
+
+/**
+ * クリップボードからTSV/CSVデータを取得し、2次元配列にパース（ヘッダーは除外）
+ */
+const getClipboardRecords = async (): Promise<string[][]> => {
+  try {
+    const text = await navigator.clipboard.readText();
+    // TSVまたはCSV判定（TSV優先）
+    const delimiter = text.includes("\t") ? "\t" : ",";
+    const lines = text.split(NEWLINE_REGEX).filter((l) => l.trim() !== "");
+
+    if (lines.length <= 1) {
+      return [];
+    }
+
+    // 1行目はヘッダーなのでスキップ
+    return lines.slice(1).map((line) => line.split(delimiter));
+  } catch (e) {
+    console.error("Failed to read clipboard:", e);
+
+    return [];
+  }
+};
+
+/**
+ * 新規レコード行（未入力の行）を取得
+ * - Drizzle StudioのUI構造に依存。必要に応じてセレクタを調整。
+ */
+const NEW_RECORD_ROW_SELECTOR = "div[role='row']:has(> div:nth-child(2) > div > span > span.text-edit-foreground)";
+const getNewRecordRows = (documentRoot: Document = document): HTMLDivElement[] => {
+  return queryAll<HTMLDivElement>(documentRoot, NEW_RECORD_ROW_SELECTOR);
+};
+
+/**
+ * 新規レコード行の各セルに値をセット
+ * @param row 対象行
+ * @param values セル値配列
+ */
+const fillRowCells = async (row: HTMLDivElement, values: string[]): Promise<void> => {
+  const [_, ...cells] = Array.from(row.children);
+
+  for (let i = 0; i < Math.min(cells.length, values.length); i++) {
+    const cell = cells[i];
+    const btn = cell.querySelector("div > button") as HTMLButtonElement | null;
+
+    if (!btn) {
+      console.warn(`No input found in cell ${i + 1}. Skipping...`);
+
+      break; // 次のセルへ
+    }
+
+    console.log(btn, values[i]);
+
+    // セルをクリック
+    btn.click();
+
+    // inputが出現するまで待機
+    let input: HTMLInputElement | null = null;
+
+    for (let retry = 0; retry < 20; retry++) {
+      input = document.querySelector("input.rdg-text-editor") as HTMLInputElement | null;
+
+      if (input) {
+        break;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+
+    if (!input) {
+      console.warn(`Input not found for cell ${i + 1}. Skipping...`);
+
+      continue;
+    }
+
+    // inputにフォーカス
+    input.focus();
+
+    // 既存の値を全選択して消す（必要なら）
+    input.select();
+
+    document.execCommand("delete");
+
+    // クリップボードAPIで値をペースト（Clipboard APIが使えない場合はexecCommandで代用）
+    // ここではexecCommand('insertText')を使う
+    // TODO: AIがexecCommandを出してきたが、後でClipboard APIに置き換える
+    document.execCommand("insertText", false, values[i]);
+
+    // 入力確定（Enterキーイベントを送る）
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+
+    input.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", bubbles: true }));
+
+    // 入力後、少し待つ
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+};
+
+/**
+ * クリップボードのレコードを新規レコード行にペースト
+ */
+const pasteRecordsToNewRows = async (): Promise<void> => {
+  const records = await getClipboardRecords();
+
+  if (records.length === 0) {
+    console.warn("No records to paste.");
+
+    return;
+  }
+
+  const newRows = getNewRecordRows();
+
+  console.log(`Found ${newRows.length} new record rows.`);
+
+  if (newRows.length === 0) {
+    console.warn("No new record rows available.");
+
+    return;
+  }
+
+  for await (const [index, record] of records.entries()) {
+    if (index >= newRows.length) {
+      console.warn("Not enough new rows to paste all records. Stopping...");
+
+      break;
+    }
+
+    await fillRowCells(newRows[index], record);
+  }
+
+  console.log(`Pasted ${Math.min(records.length, newRows.length)} record(s).`);
+};
+
 /**
  * ホットキー登録
  */
@@ -208,10 +343,25 @@ const bindCopyShortcuts = (): void => {
   });
 };
 
+/**
+ * ホットキー登録（ペースト用）
+ */
+const bindPasteShortcut = (): void => {
+  hotkeys("command+v", (event) => {
+    if (!event.repeat) {
+      event.preventDefault();
+
+      pasteRecordsToNewRows();
+    }
+  });
+};
+
 const init = (): void => {
   console.log("Initializing application...");
 
   bindCopyShortcuts();
+
+  bindPasteShortcut();
 
   console.log("Application initialized successfully.");
 };
