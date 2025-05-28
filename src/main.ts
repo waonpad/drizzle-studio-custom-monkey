@@ -195,21 +195,20 @@ const copySelectedRows = (withHeader = true): void => {
 const NEWLINE_REGEX = /\r?\n/;
 
 /**
- * クリップボードからTSV/CSVデータを取得し、2次元配列にパース（ヘッダーは除外）
+ * クリップボードからTSV/CSVデータを取得し、2次元配列にパース
+ * @param skipHeader 先頭行をヘッダーとして除外する場合はtrue
  */
-const getClipboardRecords = async (): Promise<string[][]> => {
+const getClipboardRecords = async (skipHeader = true): Promise<string[][]> => {
   try {
     const text = await navigator.clipboard.readText();
-    // TSVまたはCSV判定（TSV優先）
     const delimiter = text.includes("\t") ? "\t" : ",";
     const lines = text.split(NEWLINE_REGEX).filter((l) => l.trim() !== "");
 
-    if (lines.length <= 1) {
+    if (lines.length === 0) {
       return [];
     }
 
-    // 1行目はヘッダーなのでスキップ
-    return lines.slice(1).map((line) => line.split(delimiter));
+    return (skipHeader ? lines.slice(1) : lines).map((line) => line.split(delimiter));
   } catch (e) {
     console.error("Failed to read clipboard:", e);
 
@@ -293,9 +292,10 @@ const fillRowCells = async (row: HTMLDivElement, values: string[]): Promise<void
 
 /**
  * クリップボードのレコードを新規レコード行にペースト
+ * @param skipHeader 先頭行をヘッダーとして除外する場合はtrue
  */
-const pasteRecordsToNewRows = async (): Promise<void> => {
-  const records = await getClipboardRecords();
+const pasteRecordsToNewRows = async (skipHeader = true): Promise<void> => {
+  const records = await getClipboardRecords(skipHeader);
 
   if (records.length === 0) {
     console.warn("No records to paste.");
@@ -347,11 +347,21 @@ const bindCopyShortcuts = (): void => {
  * ホットキー登録（ペースト用）
  */
 const bindPasteShortcut = (): void => {
+  // 通常: command+v → 1行目をヘッダーとしてスキップ
   hotkeys("command+v", (event) => {
     if (!event.repeat) {
       event.preventDefault();
 
-      pasteRecordsToNewRows();
+      pasteRecordsToNewRows(true);
+    }
+  });
+
+  // 追加: command+shift+v → 1行目もデータとしてペースト
+  hotkeys("command+shift+v", (event) => {
+    if (!event.repeat) {
+      event.preventDefault();
+
+      pasteRecordsToNewRows(false);
     }
   });
 };
@@ -368,6 +378,4 @@ const init = (): void => {
 
 init();
 
-// TODO: Studioへのペースト
-// TODO: Studioへの複数行ペースト
 // TODO: リファクタリング（要素弄りがぐちゃぐちゃすぎる）
