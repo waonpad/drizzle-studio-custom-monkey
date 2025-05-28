@@ -184,3 +184,4 @@ init();
 // TODO: Studioへのペースト
 // TODO: Studioへの複数行ペースト
 // TODO: リファクタリング（要素弄りがぐちゃぐちゃすぎる）
+// TODO: text/plainへの対応
