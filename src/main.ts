@@ -93,11 +93,34 @@ function buildTable(
 }
 
 /**
- * クリップボードへコピー
+ * table要素からTSV文字列を生成
+ */
+function tableToTSV(table: HTMLTableElement): string {
+  const rows = Array.from(table.rows);
+
+  return rows
+    .map((row) =>
+      Array.from(row.cells)
+        .map((cell) => {
+          // タブや改行をエスケープ
+          // Excelでセル内改行したい場合は cell.innerText.replace(/\r?\n/g, "\n")
+          return cell.innerText.replace(/\r?\n/g, " ").replace(/\t/g, " ");
+        })
+        .join("\t"),
+    )
+    .join("\n");
+}
+
+/**
+ * クリップボードへコピー（text/html と text/plain 両対応）
  */
 function copyTableToClipboard(table: HTMLTableElement): void {
+  const html = table.outerHTML;
+  const tsv = tableToTSV(table);
+
   const data = new ClipboardItem({
-    "text/html": new Blob([table.outerHTML], { type: "text/html" }),
+    "text/html": new Blob([html], { type: "text/html" }),
+    "text/plain": new Blob([tsv], { type: "text/plain" }),
   });
 
   navigator.clipboard.write([data]).then(
@@ -184,4 +207,3 @@ init();
 // TODO: Studioへのペースト
 // TODO: Studioへの複数行ペースト
 // TODO: リファクタリング（要素弄りがぐちゃぐちゃすぎる）
-// TODO: text/plainへの対応
